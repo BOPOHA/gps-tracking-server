@@ -10,4 +10,3 @@ func IsValidCoordinates(lat_float float64, lon_float float64) bool {
 func IsValidRecord(satellites byte) bool {
 	return (satellites > 3)
 }
-

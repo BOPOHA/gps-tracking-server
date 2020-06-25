@@ -1,6 +1,5 @@
 package tools
 
-
 // HELPERS
 
 func PadLeft(str, pad string, lenght int) string {
@@ -16,4 +15,3 @@ func PadLeft(str, pad string, lenght int) string {
 		}
 	}
 }
-

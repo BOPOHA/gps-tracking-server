@@ -1,118 +1,113 @@
 <!DOCTYPE html>
 <html>
 <head>
-<meta charset="UTF-8" />
-<title>GPS TRACKER</title>
-<style>
-	html, body {
-		margin: 0;
-		padding: 0;
-		width: 100%;
-		height: 100%;
-		text-align: center;
-	}
-	#map {
-		height: 700px;
-		width: 80%;
-		margin: 60px auto;
-	}
-</style>
-<script>
+    <meta charset="UTF-8"/>
+    <title>GPS TRACKER</title>
+    <style>
+        html, body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            text-align: center;
+        }
 
-	var map;
-	var markers = [];
+        #map {
+            height: 700px;
+            width: 80%;
+            margin: 60px auto;
+        }
+    </style>
+    <script>
 
-	function initMap() {
-		// Create a map object and specify the DOM element for display.
-		map = new google.maps.Map(document.getElementById('map'), {
-			center: {lat: 44.805807, lng: 20.469332},
-			scrollwheel: false,
-			zoom: 14
-		});
+        var map;
+        var markers = [];
 
-		// document.getElementById("map").setAttribute("style", "height:" + window.innerHeight);
-	}
+        function initMap() {
+            // Create a map object and specify the DOM element for display.
+            map = new google.maps.Map(document.getElementById('map'), {
+                center: {lat: 44.805807, lng: 20.469332},
+                scrollwheel: false,
+                zoom: 14
+            });
 
-	function updateMarker(imei, speed, date, myLatLng)
-	{
-		// console.log(imei)
+            // document.getElementById("map").setAttribute("style", "height:" + window.innerHeight);
+        }
 
-		if (typeof markers[imei] === 'undefined')
-		{
-			var icon = '/truck.png';
-			markers[imei] = new google.maps.Marker({
-				position: myLatLng,
-				map: map,
-				title: 'IMEI: ' + imei,
-				icon: icon
-			});
-			map.setCenter(myLatLng);
-			initInfoWindow(imei, speed, date);
-		}
-		else
-		{
-			updateInfoWindow(imei, speed, date);
-			markers[imei].setPosition(myLatLng);
-		}
+        function updateMarker(imei, speed, date, myLatLng) {
+            // console.log(imei)
 
-		// map.setCenter(myLatLng);
-	}
+            if (typeof markers[imei] === 'undefined') {
+                var icon = '/truck.png';
+                markers[imei] = new google.maps.Marker({
+                    position: myLatLng,
+                    map: map,
+                    title: 'IMEI: ' + imei,
+                    icon: icon
+                });
+                map.setCenter(myLatLng);
+                initInfoWindow(imei, speed, date);
+            } else {
+                updateInfoWindow(imei, speed, date);
+                markers[imei].setPosition(myLatLng);
+            }
 
-	function initInfoWindow(imei, speed, date)
-	{
-		var contentString = '<div id="content">'+
-			'<div id="siteNotice">'+
-			'</div>'+
-			'<h1 id="firstHeading" class="firstHeading" style="text-align:left;">' + imei + '</h1>'+
-			'<div id="bodyContent" style="text-align:left;">'+
-			'Brzina: <span id="' + imei + '-speed-info-window">' + speed + '</span> kmh<br />' +
-			'Vreme GPS zapisa: <span id="' + imei + '-date-info-window">' + date + '</span>' +
-			'</div>'+
-			'</div>';
+            // map.setCenter(myLatLng);
+        }
 
-		var infowindow = new google.maps.InfoWindow({
-			content: contentString
-		});
+        function initInfoWindow(imei, speed, date) {
+            var contentString = '<div id="content">' +
+                '<div id="siteNotice">' +
+                '</div>' +
+                '<h1 id="firstHeading" class="firstHeading" style="text-align:left;">' + imei + '</h1>' +
+                '<div id="bodyContent" style="text-align:left;">' +
+                'Brzina: <span id="' + imei + '-speed-info-window">' + speed + '</span> kmh<br />' +
+                'Vreme GPS zapisa: <span id="' + imei + '-date-info-window">' + date + '</span>' +
+                '</div>' +
+                '</div>';
 
-		markers[imei].addListener('click', function() {
-			infowindow.open(map, markers[imei]);
-		});
-	}
+            var infowindow = new google.maps.InfoWindow({
+                content: contentString
+            });
 
-	function updateInfoWindow(imei, speed, date)
-	{
-		var element_speed = document.getElementById(imei + '-speed-info-window');
-		var element_date = document.getElementById(imei + '-date-info-window');
+            markers[imei].addListener('click', function () {
+                infowindow.open(map, markers[imei]);
+            });
+        }
 
-		if (element_speed) element_speed.innerHTML = speed;
-		if (element_date) element_date.innerHTML = date;
-	}
+        function updateInfoWindow(imei, speed, date) {
+            var element_speed = document.getElementById(imei + '-speed-info-window');
+            var element_date = document.getElementById(imei + '-date-info-window');
 
-	var serversocket = new WebSocket("ws://localhost:1337/location");
+            if (element_speed) element_speed.innerHTML = speed;
+            if (element_date) element_date.innerHTML = date;
+        }
 
-	serversocket.onopen = function() {
-		// serversocket.send("Connection init");
-	}
+        var serversocket = new WebSocket("ws://localhost:1337/location");
 
-	serversocket.onmessage = function(e) {
-		var res = JSON.parse(e.data);
-		var date = new Date(res.gpstime * 1000);
+        serversocket.onopen = function () {
+            // serversocket.send("Connection init");
+        }
 
-		var record_text = "[" + date + "] " + res.imei + ' : ' + res.lon + "," + res.lat;
+        serversocket.onmessage = function (e) {
+            var res = JSON.parse(e.data);
+            var date = new Date(res.gpstime * 1000);
 
-		console.log(record_text);
+            var record_text = "[" + date + "] " + res.imei + ' : ' + res.lon + "," + res.lat;
 
-		updateMarker(res.imei, res.speed, date, {lat: parseFloat(res.lat), lng: parseFloat(res.lon)});
+            console.log(record_text);
 
-		// document.getElementById("locations").innerHTML += record_text + "<br>";
-	};
+            updateMarker(res.imei, res.speed, date, {lat: parseFloat(res.lat), lng: parseFloat(res.lon)});
+
+            // document.getElementById("locations").innerHTML += record_text + "<br>";
+        };
 
 
-</script>
-<script src="https://maps.googleapis.com/maps/api/js?key=GOOGLE_MAPS_KEY&callback=initMap" async defer></script>
+    </script>
+    <script src="https://maps.googleapis.com/maps/api/js?key=GOOGLE_MAPS_KEY&callback=initMap" async defer></script>
 </head>
 
 <body>
-	<div id="map"></div>
+<div id="map"></div>
 </body>
 </html>

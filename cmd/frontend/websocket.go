@@ -10,23 +10,25 @@ import (
 	"net/http"
 	"time"
 )
+
 var upgrader = websocket.Upgrader{
 	ReadBufferSize:  1024,
 	WriteBufferSize: 1024,
 }
 
 type Device struct {
-	Imei       string
+	Imei      string
 	Timestamp int
 }
 
 type MapMarker struct {
-	Imei string `json:"imei"`
-	GpsTime int `json:"gpstime"`
-	Lon float64 `json:"lon"`
-	Lat float64 `json:"lat"`
-	Speed int `json:"speed"`
+	Imei    string  `json:"imei"`
+	GpsTime int     `json:"gpstime"`
+	Lon     float64 `json:"lon"`
+	Lat     float64 `json:"lat"`
+	Speed   int     `json:"speed"`
 }
+
 func main() {
 	http.HandleFunc("/location", locationHandler)
 	http.Handle("/", http.FileServer(http.Dir(".")))
@@ -77,7 +79,7 @@ func locationHandler(w http.ResponseWriter, r *http.Request) {
 				continue
 			}
 
-			if (record.GpsTime > device.Timestamp) {
+			if record.GpsTime > device.Timestamp {
 
 				// gpstime := time.Unix(int64(record.GpsTime), 0)
 				coor := record.Location.Coordinates
@@ -96,8 +98,8 @@ func locationHandler(w http.ResponseWriter, r *http.Request) {
 					return
 				}
 
-				err1 := conn.WriteMessage(websocket.TextMessage, []byte(out));
-				if  err1 != nil {
+				err1 := conn.WriteMessage(websocket.TextMessage, []byte(out))
+				if err1 != nil {
 					return
 				}
 
@@ -112,4 +114,3 @@ func locationHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 }
-

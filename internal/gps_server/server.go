@@ -62,7 +62,7 @@ type GpsRecord struct {
 	Speed      int         `json:"speed"`
 	Satellites int         `json:"satellites"`
 	Sensors    []GpsSensor `json:"sensors"`
-	GpsTime    int         `json:"gpstime"`    // vreme dobijeno od uređaja
+	GpsTime    int         `json:"gpstime"` // vreme dobijeno od uređaja
 	Timestamp  int         `json:"timestamp"`
 	Protocol   string      `json:"protocol"`
 	Valid      bool        `json:"valid"` // Zapis smatramo validnim ako ima 3+ satelita
@@ -118,7 +118,7 @@ func (s *GpsServer) Start(host string, port string) {
 
 func (s *GpsServer) Listen(host string, port string) {
 
-	laddr, _ := net.ResolveTCPAddr("tcp", host + ":" + port)
+	laddr, _ := net.ResolveTCPAddr("tcp", host+":"+port)
 
 	listener, err := net.ListenTCP("tcp", laddr)
 	if err != nil {
@@ -135,11 +135,11 @@ func (s *GpsServer) Serve() {
 	defer s.waitGroup.Done()
 	for {
 		select {
-			case <-s.ch:
-				log.Println("INFO", "Stopping listening on", s.listener.Addr())
-				s.listener.Close()
-				return
-			default:
+		case <-s.ch:
+			log.Println("INFO", "Stopping listening on", s.listener.Addr())
+			s.listener.Close()
+			return
+		default:
 		}
 		s.listener.SetDeadline(time.Now().Add(5e9)) // 5 secs
 		conn, err := s.listener.AcceptTCP()
@@ -168,9 +168,9 @@ func (s *GpsServer) HandleRequest(conn *net.TCPConn) {
 
 	for {
 		select {
-			case <-s.ch:
-				return
-			default:
+		case <-s.ch:
+			return
+		default:
 		}
 
 		conn.SetReadDeadline(time.Now().Add(5e9)) // 5 secs
@@ -196,7 +196,7 @@ func (s *GpsServer) HandleRequest(conn *net.TCPConn) {
 
 		res := s.protocol.Handle(readbuff, conn, imei)
 		if res.Error != nil {
-			log.Println("ERROR", res.Error);
+			log.Println("ERROR", res.Error)
 			return
 		}
 

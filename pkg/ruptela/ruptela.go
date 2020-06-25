@@ -22,12 +22,11 @@ const (
 )
 
 type RuptelaProtocol struct {
-
 }
 
 func (p *RuptelaProtocol) Handle(readbuff []byte, conn *net.TCPConn, imei string) gps_server.HandlerResponse {
 
-	res := gps_server.HandlerResponse{};
+	res := gps_server.HandlerResponse{}
 
 	buff := bytes.NewBuffer(readbuff)
 
@@ -48,19 +47,19 @@ func (p *RuptelaProtocol) Handle(readbuff []byte, conn *net.TCPConn, imei string
 
 func (p *RuptelaProtocol) getRecords(buff *bytes.Buffer) ([]gps_server.GpsRecord, error) {
 
-	var records []gps_server.GpsRecord;
+	var records []gps_server.GpsRecord
 
-	var imei          uint64
-	var tip           byte   // tip zahteva
-	var records_left  byte   // broj preostalih recorda na uređaju (ne koristimo za sada)
-	var records_count byte   // broj recorda u tekućem zahtevu
-	var gpstime       uint32
-	var lon           int32
-	var lat           int32
-	var alt           uint16
-	var course        uint16
-	var sat           byte
-	var speed         uint16
+	var imei uint64
+	var tip byte           // tip zahteva
+	var records_left byte  // broj preostalih recorda na uređaju (ne koristimo za sada)
+	var records_count byte // broj recorda u tekućem zahtevu
+	var gpstime uint32
+	var lon int32
+	var lat int32
+	var alt uint16
+	var course uint16
+	var sat byte
+	var speed uint16
 
 	// buff := bytes.NewBuffer(readbuff)
 
@@ -98,28 +97,27 @@ func (p *RuptelaProtocol) getRecords(buff *bytes.Buffer) ([]gps_server.GpsRecord
 		binary.Read(buff, binary.BigEndian, &sat)
 		binary.Read(buff, binary.BigEndian, &speed)
 
-		lon_float := float64(lon)/10000000
-		lat_float := float64(lat)/10000000
+		lon_float := float64(lon) / 10000000
+		lat_float := float64(lat) / 10000000
 
-
-		if ! tools.IsValidCoordinates(lat_float, lon_float) {
+		if !tools.IsValidCoordinates(lat_float, lon_float) {
 			log.Println("ERROR", "Nepravilne vrednosti koordinata! IMEI:", imeiString, "Lon:", lon_float, "Lat:", lat_float)
 			continue
 		}
 
 		location := gps_server.GeoJson{"Point", []float64{lon_float, lat_float}}
-		sensors  := make([]gps_server.GpsSensor, 0) // TODO
+		sensors := make([]gps_server.GpsSensor, 0) // TODO
 
 		buff.Next(2)
 
 		// Senzori mogu da šalju podatke u setovima veličine 1/2/4/8 bajtova
 		// Podaci su naslagani redom sa prefix bajtom koji predstavlja broj bajtova u setu (bytes_count)
 		var bytes_count byte
-		var sensor_id   byte
-		var data1       byte
-		var data2       uint16
-		var data4       uint32
-		var data8       uint64
+		var sensor_id byte
+		var data1 byte
+		var data2 uint16
+		var data4 uint32
+		var data8 uint64
 
 		// Read 1 byte data
 		binary.Read(buff, binary.BigEndian, &bytes_count)
@@ -159,7 +157,7 @@ func (p *RuptelaProtocol) getRecords(buff *bytes.Buffer) ([]gps_server.GpsRecord
 
 		is_valid := tools.IsValidRecord(sat)
 
-		record := gps_server.GpsRecord{imeiString, location, float32(alt)/10, float32(course)/100, int(speed), int(sat), sensors, int(gpstime), int(time.Now().Unix()), RUPTELA_PROTOCOL, is_valid}
+		record := gps_server.GpsRecord{imeiString, location, float32(alt) / 10, float32(course) / 100, int(speed), int(sat), sensors, int(gpstime), int(time.Now().Unix()), RUPTELA_PROTOCOL, is_valid}
 
 		records = append(records, record)
 	}
