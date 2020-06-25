@@ -1,17 +1,19 @@
 /**
  * Ruptela Protocol
  */
-package main
+package ruptela
 
 import (
-	// "fmt"
-	"net"
-	"time"
-	"log"
 	"bytes"
 	"encoding/binary"
-	"strconv"
 	"errors"
+
+	"github.com/nenadvasic/gps-tracking-server/internal/gps_server"
+	"github.com/nenadvasic/gps-tracking-server/internal/tools"
+	"log"
+	"net"
+	"strconv"
+	"time"
 )
 
 const (
@@ -23,30 +25,30 @@ type RuptelaProtocol struct {
 
 }
 
-func (p *RuptelaProtocol) handle(readbuff []byte, conn *net.TCPConn, imei string) HandlerResponse {
+func (p *RuptelaProtocol) Handle(readbuff []byte, conn *net.TCPConn, imei string) gps_server.HandlerResponse {
 
-	res := HandlerResponse{};
+	res := gps_server.HandlerResponse{};
 
 	buff := bytes.NewBuffer(readbuff)
 
 	records, err1 := p.getRecords(buff)
 	if err1 != nil {
-		res.error = err1
+		res.Error = err1
 	}
-	res.records = records
+	res.Records = records
 
 	// Šaljemo ACK
 	_, err2 := conn.Write([]byte{0x00, 0x02, 0x64, 0x01, 0x13, 0xbc})
 	if err2 != nil {
-		res.error = err2
+		res.Error = err2
 	}
 
 	return res
 }
 
-func (p *RuptelaProtocol) getRecords(buff *bytes.Buffer) ([]GpsRecord, error) {
+func (p *RuptelaProtocol) getRecords(buff *bytes.Buffer) ([]gps_server.GpsRecord, error) {
 
-	var records []GpsRecord;
+	var records []gps_server.GpsRecord;
 
 	var imei          uint64
 	var tip           byte   // tip zahteva
@@ -69,7 +71,7 @@ func (p *RuptelaProtocol) getRecords(buff *bytes.Buffer) ([]GpsRecord, error) {
 	binary.Read(buff, binary.BigEndian, &imei)
 	binary.Read(buff, binary.BigEndian, &tip)
 
-	imeiString := padLeft(strconv.FormatUint(imei, 10), "0", 15)
+	imeiString := tools.PadLeft(strconv.FormatUint(imei, 10), "0", 15)
 
 	// log.Println("INFO", "Device IMEI:", imeiString)
 
@@ -100,13 +102,13 @@ func (p *RuptelaProtocol) getRecords(buff *bytes.Buffer) ([]GpsRecord, error) {
 		lat_float := float64(lat)/10000000
 
 
-		if ! isValidCoordinates(lat_float, lon_float) {
+		if ! tools.IsValidCoordinates(lat_float, lon_float) {
 			log.Println("ERROR", "Nepravilne vrednosti koordinata! IMEI:", imeiString, "Lon:", lon_float, "Lat:", lat_float)
 			continue
 		}
 
-		location := GeoJson{"Point", []float64{lon_float, lat_float}}
-		sensors  := make([]GpsSensor, 0) // TODO
+		location := gps_server.GeoJson{"Point", []float64{lon_float, lat_float}}
+		sensors  := make([]gps_server.GpsSensor, 0) // TODO
 
 		buff.Next(2)
 
@@ -155,9 +157,9 @@ func (p *RuptelaProtocol) getRecords(buff *bytes.Buffer) ([]GpsRecord, error) {
 			// TODO: Dodavanje u slice sensors
 		}
 
-		is_valid := isValidRecord(sat)
+		is_valid := tools.IsValidRecord(sat)
 
-		record := GpsRecord{imeiString, location, float32(alt)/10, float32(course)/100, int(speed), int(sat), sensors, int(gpstime), int(time.Now().Unix()), RUPTELA_PROTOCOL, is_valid}
+		record := gps_server.GpsRecord{imeiString, location, float32(alt)/10, float32(course)/100, int(speed), int(sat), sensors, int(gpstime), int(time.Now().Unix()), RUPTELA_PROTOCOL, is_valid}
 
 		records = append(records, record)
 	}

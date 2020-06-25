@@ -1,27 +1,20 @@
 package main
 
 import (
-	// "fmt"
-	// "net"
+	"encoding/json"
+	"github.com/nenadvasic/gps-tracking-server/internal/gps_server"
+	"github.com/nenadvasic/gps-tracking-server/pkg/ruptela"
+	"github.com/nenadvasic/gps-tracking-server/pkg/teltonika"
 	"log"
 	"os"
 	"os/signal"
 	"syscall"
-	"encoding/json"
 )
 
-type DbConfig struct {
-	Host string `json:"host"`
-	User string `json:"user"`
-	Pass string `json:"pass"`
-	Name string `json:"name"`
-	Col  string `json:"col"`
-}
-
 type Config struct {
-	Host         string        `json:"host"`
-	Db           *DbConfig     `json:"db"`
-	GpsProtocols []GpsProtocol `json:"protocols"`
+	Host         string                   `json:"host"`
+	Db           *gps_server.DbConfig     `json:"db"`
+	GpsProtocols []gps_server.GpsProtocol `json:"protocols"`
 }
 
 func main() {
@@ -44,34 +37,34 @@ func main() {
 
 	log.Println("INFO", "Broj protokola u konfiguraciji:", count_protocols)
 
-	var servers []*GpsServer;
+	var servers []*gps_server.GpsServer
 
-	host := config.Host;
+	host := config.Host
 
 	for i := 0; i < count_protocols; i++ {
 
 		protocol_name := config.GpsProtocols[i].Name
-		protocol_port := config.GpsProtocols[i].Port;
+		protocol_port := config.GpsProtocols[i].Port
 
 		if config.GpsProtocols[i].Enabled {
 
-			var protocol_handler GpsProtocolHandler
+			var protocol_handler gps_server.GpsProtocolHandler
 
 			if protocol_name == "ruptela" {
-				protocol_handler = GpsProtocolHandler(&RuptelaProtocol{})
+				protocol_handler = gps_server.GpsProtocolHandler(&ruptela.RuptelaProtocol{})
 			} else if protocol_name == "teltonika" {
-				protocol_handler = GpsProtocolHandler(&TeltonikaProtocol{})
+				protocol_handler = gps_server.GpsProtocolHandler(&teltonika.TeltonikaProtocol{})
 			} else {
 				log.Fatalln("ERROR", "Protocol handler nije definisan:", protocol_name)
 			}
 
-			s := NewGpsServer(protocol_name, config.Db, protocol_handler)
+			s := gps_server.NewGpsServer(protocol_name, config.Db, protocol_handler)
 
 			s.Start(host, protocol_port)
 
 			// log.Println("INFO", "Server pokrenut za protokol " + protocol_name + " na portu " + protocol_port)
 
-			servers = append(servers, s);
+			servers = append(servers, s)
 		}
 	}
 
@@ -91,30 +84,9 @@ func main() {
 	log.Println("INFO", "Program zaustavljen")
 }
 
-func stopServers(servers []*GpsServer) {
+func stopServers(servers []*gps_server.GpsServer) {
 
 	for _, server := range servers {
 		server.Stop()
 	}
 }
-
-// HELPERS
-
-func padLeft(str, pad string, lenght int) string {
-
-	if len(str) >= lenght {
-		return str
-	}
-
-	for {
-		str = pad + str
-		if len(str) >= lenght {
-			return str
-		}
-	}
-}
-
-
-
-
-

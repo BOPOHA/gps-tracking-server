@@ -1,25 +1,24 @@
 /**
  * GPS Tracking Server
  */
-package main
+package gps_server
 
 import (
-	"sync"
+	"gopkg.in/mgo.v2"
 	"log"
 	"net"
-	"gopkg.in/mgo.v2"
+	"sync"
 	"time"
-	// "errors"
 )
 
 type GpsProtocolHandler interface {
-	handle([]byte, *net.TCPConn, string) HandlerResponse
+	Handle([]byte, *net.TCPConn, string) HandlerResponse
 }
 
 type HandlerResponse struct {
-	error   error
-	imei    string
-	records []GpsRecord
+	Error   error
+	Imei    string
+	Records []GpsRecord
 }
 
 type GpsProtocol struct {
@@ -45,9 +44,17 @@ type GpsSensor struct {
 // 	// Active bool
 // }
 
+type DbConfig struct {
+	Host string `json:"host"`
+	User string `json:"user"`
+	Pass string `json:"pass"`
+	Name string `json:"name"`
+	Col  string `json:"col"`
+}
+
 type GpsRecord struct {
-	Imei       string      `json:"imei"`
-	Location   GeoJson     `json:"location"`
+	Imei     string  `json:"imei"`
+	Location GeoJson `json:"location"`
 	//         Latitude    float64             `json:"lat"`
 	//         Longitude   float64             `json:"lon"`
 	Altitude   float32     `json:"alt"`
@@ -187,16 +194,16 @@ func (s *GpsServer) HandleRequest(conn *net.TCPConn) {
 			i = 0
 		}
 
-		res := s.protocol.handle(readbuff, conn, imei)
-		if res.error != nil {
-			log.Println("ERROR", res.error);
+		res := s.protocol.Handle(readbuff, conn, imei)
+		if res.Error != nil {
+			log.Println("ERROR", res.Error);
 			return
 		}
 
-		imei = res.imei
+		imei = res.Imei
 
-		if len(res.records) > 0 {
-			s.SaveGpsRecords(res.records)
+		if len(res.Records) > 0 {
+			s.SaveGpsRecords(res.Records)
 		}
 	}
 }
@@ -228,18 +235,6 @@ func (s *GpsServer) Stop() {
 	close(s.ch)
 	s.waitGroup.Wait()
 }
-
-func isValidCoordinates(lat_float float64, lon_float float64) bool {
-	if lon_float == 0 || lon_float < -180 || lon_float > 180 || lat_float == 0 || lat_float < -90 || lat_float > 90 {
-		return false
-	}
-	return true
-}
-
-func isValidRecord(satellites byte) bool {
-	return (satellites > 3)
-}
-
 
 /*
 func writeLog(a ...interface{}) {

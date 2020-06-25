@@ -1,15 +1,14 @@
 package main
 
 import (
+	"encoding/json"
+	"fmt"
+	"github.com/nenadvasic/gps-tracking-server/internal/gps_server"
 	"github.com/gorilla/websocket"
 	"gopkg.in/mgo.v2"
 	"labix.org/v2/mgo/bson"
 	"net/http"
-	"fmt"
 	"time"
-	"encoding/json"
-	// "strconv"
-	// "os"
 )
 var upgrader = websocket.Upgrader{
 	ReadBufferSize:  1024,
@@ -20,30 +19,7 @@ type Device struct {
 	Imei       string
 	Timestamp int
 }
-type GeoJson struct {
-	Type        string    `json:"type"`
-	Coordinates []float64 `json:"coordinates"`
-}
 
-// TODO
-type GpsSensor struct {
-	SensorId string
-}
-
-type GpsRecord struct {
-	Imei       string      `json:"imei"`
-	Location   GeoJson     `json:"location"`
-	//         Latitude    float64             `json:"lat"`
-	//         Longitude   float64             `json:"lon"`
-	Altitude   float32     `json:"alt"`
-	Course     float32     `json:"course"`
-	Speed      int         `json:"speed"`
-	Satellites int         `json:"satellites"`
-	Sensors    []GpsSensor `json:"sensors"`
-	GpsTime    int         `json:"gpstime"`    // vreme dobijeno od uređaja
-	Timestamp  int         `json:"timestamp"`
-	Protocol   string      `json:"protocol"`
-}
 type MapMarker struct {
 	Imei string `json:"imei"`
 	GpsTime int `json:"gpstime"`
@@ -87,7 +63,7 @@ func locationHandler(w http.ResponseWriter, r *http.Request) {
 
 	c := mongoSession.DB("gpsdb").C("records")
 
-	var record GpsRecord
+	var record gps_server.GpsRecord
 
 	for {
 		for i, device := range devices {
