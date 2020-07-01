@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"github.com/nenadvasic/gps-tracking-server/internal/gps_server"
+	"github.com/nenadvasic/gps-tracking-server/pkg/gpshome"
 	"github.com/nenadvasic/gps-tracking-server/pkg/ruptela"
 	"github.com/nenadvasic/gps-tracking-server/pkg/teltonika"
 	"log"
@@ -49,12 +50,18 @@ func main() {
 		if config.GpsProtocols[i].Enabled {
 
 			var protocol_handler gps_server.GpsProtocolHandler
-
-			if protocol_name == "ruptela" {
+			switch protocol_name {
+			case "ruptela":
 				protocol_handler = gps_server.GpsProtocolHandler(&ruptela.RuptelaProtocol{})
-			} else if protocol_name == "teltonika" {
+			case "teltonika":
 				protocol_handler = gps_server.GpsProtocolHandler(&teltonika.TeltonikaProtocol{})
-			} else {
+			case "gpshome":
+				protocol_handler = gps_server.GpsProtocolHandler(
+					&gpshome.GpsHomeProtocol{
+						make(chan []byte, 3),
+					},
+				)
+			default:
 				log.Fatalln("ERROR", "Protocol handler nije definisan:", protocol_name)
 			}
 

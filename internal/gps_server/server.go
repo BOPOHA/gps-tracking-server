@@ -175,7 +175,7 @@ func (s *GpsServer) HandleRequest(conn *net.TCPConn) {
 
 		conn.SetReadDeadline(time.Now().Add(5e9)) // 5 secs
 
-		readbuff := make([]byte, 2048) // TODO: Šta ako je input veći od 2048 ?
+		readbuff := make([]byte, 256) // TODO: Šta ako je input veći od 2048 ?
 
 		_, err := conn.Read(readbuff)
 		if err != nil {

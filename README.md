@@ -13,3 +13,10 @@ go mod download
 go build -o ~/bin/gps-gatewayd cmd/gatewayd/*go
 go build -o ~/bin/gps-frontend cmd/frontend/*go
 ```
+
+# test commands
+```shell script
+echo -n '*2a48512c373032383131343038322c435223#'       | nc auth.vorona.me 7700 # println(hex.EncodeToString([]byte("*HQ,7028114082,CR#")))
+echo -n '*2a48512c373032383131343038322c56342c435223#' | nc auth.vorona.me 7700 # println(hex.EncodeToString([]byte("*HQ,7028114082,V4,CR#")))
+
+```

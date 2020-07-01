@@ -3,8 +3,8 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/nenadvasic/gps-tracking-server/internal/gps_server"
 	"github.com/gorilla/websocket"
+	"github.com/nenadvasic/gps-tracking-server/internal/gps_server"
 	"gopkg.in/mgo.v2"
 	"labix.org/v2/mgo/bson"
 	"net/http"
