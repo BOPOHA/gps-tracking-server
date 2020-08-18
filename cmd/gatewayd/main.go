@@ -34,23 +34,16 @@ func main() {
 		log.Fatalln("ERROR", err1)
 	}
 
-	count_protocols := len(config.GpsProtocols)
+	servers := gps_server.NewGpsServers(config.Db)
+	log.Println("INFO", "Broj protokola u konfiguraciji:", len(config.GpsProtocols))
 
-	log.Println("INFO", "Broj protokola u konfiguraciji:", count_protocols)
+	for _, gpsProtocol := range config.GpsProtocols {
 
-	var servers []*gps_server.GpsServer
-
-	host := config.Host
-
-	for i := 0; i < count_protocols; i++ {
-
-		protocol_name := config.GpsProtocols[i].Name
-		protocol_port := config.GpsProtocols[i].Port
-
-		if config.GpsProtocols[i].Enabled {
+		if gpsProtocol.Enabled {
 
 			var protocol_handler gps_server.GpsProtocolHandler
-			switch protocol_name {
+
+			switch gpsProtocol.Name {
 			case "ruptela":
 				protocol_handler = gps_server.GpsProtocolHandler(&ruptela.RuptelaProtocol{})
 			case "teltonika":
@@ -62,16 +55,14 @@ func main() {
 					},
 				)
 			default:
-				log.Fatalln("ERROR", "Protocol handler nije definisan:", protocol_name)
+				log.Fatalln("ERROR", "Protocol handler nije definisan:", gpsProtocol.Name)
 			}
 
-			s := gps_server.NewGpsServer(protocol_name, config.Db, protocol_handler)
+			s := servers.NewGpsServer(gpsProtocol.Name, protocol_handler)
 
-			s.Start(host, protocol_port)
+			s.Start(config.Host, gpsProtocol.Port)
 
-			// log.Println("INFO", "Server pokrenut za protokol " + protocol_name + " na portu " + protocol_port)
-
-			servers = append(servers, s)
+			log.Println("INFO", "Server pokrenut za protokol "+gpsProtocol.Name+" na portu "+gpsProtocol.Port)
 		}
 	}
 
@@ -85,15 +76,6 @@ func main() {
 	// <-ch
 	log.Println("INFO", "Dobijen signal", <-ch)
 
-	stopServers(servers)
-
-	// time.Sleep(10000 * time.Millisecond)
+	servers.Stop()
 	log.Println("INFO", "Program zaustavljen")
-}
-
-func stopServers(servers []*gps_server.GpsServer) {
-
-	for _, server := range servers {
-		server.Stop()
-	}
 }

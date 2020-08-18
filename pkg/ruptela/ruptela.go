@@ -24,7 +24,7 @@ const (
 type RuptelaProtocol struct {
 }
 
-func (p *RuptelaProtocol) Handle(readbuff []byte, conn *net.TCPConn, imei string) gps_server.HandlerResponse {
+func (p *RuptelaProtocol) Handle(readbuff []byte, conn net.Conn) gps_server.HandlerResponse {
 
 	res := gps_server.HandlerResponse{}
 

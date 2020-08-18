@@ -4,6 +4,7 @@
 package gps_server
 
 import (
+	"bufio"
 	"gopkg.in/mgo.v2"
 	"log"
 	"net"
@@ -12,7 +13,7 @@ import (
 )
 
 type GpsProtocolHandler interface {
-	Handle([]byte, *net.TCPConn, string) HandlerResponse
+	Handle([]byte, net.Conn) HandlerResponse
 }
 
 type HandlerResponse struct {
@@ -70,19 +71,18 @@ type GpsRecord struct {
 
 type GpsServer struct {
 	name         string
-	ch           chan bool
-	waitGroup    *sync.WaitGroup
-	dbConfig     *DbConfig
+	mu           *sync.RWMutex
 	mongoSession *mgo.Session
-	listener     *net.TCPListener
+	listener     net.Listener
 	protocol     GpsProtocolHandler
 }
 
-func NewGpsServer(name string, dbConfig *DbConfig, protocol GpsProtocolHandler) *GpsServer {
+type GpsServers struct {
+	mongoSession *mgo.Session
+	servers      map[string]*GpsServer
+}
 
-	// log.Fatalln(protocol)
-
-	log.Println("INFO", "Inicijalizacija servera:", name)
+func NewGpsServers(dbConfig *DbConfig) *GpsServers {
 
 	mongoSession, err := mgo.DialWithInfo(&mgo.DialInfo{
 		Addrs:    []string{dbConfig.Host},
@@ -95,17 +95,22 @@ func NewGpsServer(name string, dbConfig *DbConfig, protocol GpsProtocolHandler) 
 	if err != nil {
 		log.Fatalln("ERROR", "Neuspešno konektovanje na bazu:", err)
 	}
+	return &GpsServers{
+		mongoSession: mongoSession,
+		servers:      make(map[string]*GpsServer),
+	}
+}
+
+func (ss *GpsServers) NewGpsServer(name string, protocol GpsProtocolHandler) *GpsServer {
+
+	log.Println("INFO", "Inicijalizacija servera:", name)
 
 	s := &GpsServer{
 		name:         name,
-		ch:           make(chan bool),
-		waitGroup:    &sync.WaitGroup{},
-		dbConfig:     dbConfig,
-		mongoSession: mongoSession,
+		mongoSession: ss.mongoSession,
 		protocol:     protocol,
 	}
 
-	s.waitGroup.Add(1)
 	return s
 }
 
@@ -118,13 +123,10 @@ func (s *GpsServer) Start(host string, port string) {
 
 func (s *GpsServer) Listen(host string, port string) {
 
-	laddr, _ := net.ResolveTCPAddr("tcp", host+":"+port)
-
-	listener, err := net.ListenTCP("tcp", laddr)
+	listener, err := net.Listen("tcp4", host+":"+port)
 	if err != nil {
 		log.Fatalln("ERROR", "Program nije u mogućnosti da otvori listening socket:", err.Error())
 	}
-	// defer listener.Close()
 
 	log.Println("INFO", "Socket uspešno otvoren na", listener.Addr())
 
@@ -132,75 +134,29 @@ func (s *GpsServer) Listen(host string, port string) {
 }
 
 func (s *GpsServer) Serve() {
-	defer s.waitGroup.Done()
 	for {
-		select {
-		case <-s.ch:
-			log.Println("INFO", "Stopping listening on", s.listener.Addr())
-			s.listener.Close()
-			return
-		default:
+		conn, err := s.listener.Accept()
+		if err != nil {
+			panic(err)
 		}
-		s.listener.SetDeadline(time.Now().Add(5e9)) // 5 secs
-		conn, err := s.listener.AcceptTCP()
-		if nil != err {
-			if opErr, ok := err.(*net.OpError); ok && opErr.Timeout() {
-				continue
-			}
-			log.Println(err)
-		}
-		log.Println("INFO", "Connected:", conn.RemoteAddr())
-		// conn.SetKeepAlive(true)
-		s.waitGroup.Add(1)
 		go s.HandleRequest(conn)
 	}
 }
 
-func (s *GpsServer) HandleRequest(conn *net.TCPConn) {
+func (s *GpsServer) HandleRequest(conn net.Conn) {
 
 	defer log.Println("INFO", "Disconnecting:", conn.RemoteAddr())
 	defer conn.Close()
-	defer s.waitGroup.Done()
+	conn.SetReadDeadline(time.Now().Add(time.Second * 5))
+	scanner := bufio.NewScanner(conn)
 
-	var imei string
-
-	var i int = 0
-
-	for {
-		select {
-		case <-s.ch:
-			return
-		default:
-		}
-
-		conn.SetReadDeadline(time.Now().Add(5e9)) // 5 secs
-
-		readbuff := make([]byte, 256) // TODO: Šta ako je input veći od 2048 ?
-
-		_, err := conn.Read(readbuff)
-		if err != nil {
-			if opErr, ok := err.(*net.OpError); ok && opErr.Timeout() {
-				// Posle 60 timeout-a (5 minuta) zatvaramo konekciju
-				if i >= 60 {
-					return
-				} else {
-					i++
-					continue
-				}
-			}
-			log.Println("ERROR", "Connection Read:", err)
-			return
-		} else {
-			i = 0
-		}
-
-		res := s.protocol.Handle(readbuff, conn, imei)
+	for scanner.Scan() {
+		readbuff := scanner.Bytes()
+		res := s.protocol.Handle(readbuff, conn)
 		if res.Error != nil {
 			log.Println("ERROR", res.Error)
 			return
 		}
-
-		imei = res.Imei
 
 		if len(res.Records) > 0 {
 			s.SaveGpsRecords(res.Records)
@@ -213,7 +169,7 @@ func (s *GpsServer) SaveGpsRecords(records []GpsRecord) bool {
 	sessionCopy := s.mongoSession.Copy()
 	defer sessionCopy.Close()
 
-	c := sessionCopy.DB(s.dbConfig.Name).C(s.dbConfig.Col)
+	c := sessionCopy.DB("dbname").C("collection")
 
 	for _, record := range records {
 		err1 := c.Insert(record)
@@ -228,20 +184,9 @@ func (s *GpsServer) SaveGpsRecords(records []GpsRecord) bool {
 	return true
 }
 
-func (s *GpsServer) Stop() {
-	log.Println("INFO", "Zaustavljanje servera:", s.name)
-	// s.mongoSession.Close()
-	// s.listener.Close()
-	close(s.ch)
-	s.waitGroup.Wait()
+func (ss *GpsServers) Stop() {
+
+	for _, s := range ss.servers {
+		s.listener.Close()
+	}
 }
-
-/*
-func writeLog(a ...interface{}) {
-
-	time := time.Now().Format("2006-01-02 15:04:05")
-
-	fmt.Print("[", time, "] ")
-	fmt.Println(a...)
-}
-*/

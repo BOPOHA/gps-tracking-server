@@ -69,7 +69,7 @@ type GpsHomeProtocol struct {
 	CmdReader chan []byte
 }
 
-func (p *GpsHomeProtocol) Handle(readbuff []byte, conn *net.TCPConn, _ string) gps_server.HandlerResponse {
+func (p *GpsHomeProtocol) Handle(readbuff []byte, conn net.Conn) gps_server.HandlerResponse {
 
 	res := gps_server.HandlerResponse{}
 

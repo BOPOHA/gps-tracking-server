@@ -25,10 +25,11 @@ const (
 type TeltonikaProtocol struct {
 }
 
-func (p *TeltonikaProtocol) Handle(readbuff []byte, conn *net.TCPConn, imei string) gps_server.HandlerResponse {
+func (p *TeltonikaProtocol) Handle(readbuff []byte, conn net.Conn) gps_server.HandlerResponse {
 	buff := bytes.NewBuffer(readbuff)
 
 	var start_bytes uint16
+	var imei string
 
 	binary.Read(buff, binary.BigEndian, &start_bytes)
 
