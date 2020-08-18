@@ -34,7 +34,7 @@
             // document.getElementById("map").setAttribute("style", "height:" + window.innerHeight);
         }
 
-        function updateMarker(imei, speed, date, myLatLng) {
+        function updateMarker(name, imei, speed, date, myLatLng) {
             // console.log(imei)
 
             if (typeof markers[imei] === 'undefined') {
@@ -42,11 +42,11 @@
                 markers[imei] = new google.maps.Marker({
                     position: myLatLng,
                     map: map,
-                    title: 'IMEI: ' + imei,
+                    title: name,
                     icon: icon
                 });
                 map.setCenter(myLatLng);
-                initInfoWindow(imei, speed, date);
+                initInfoWindow(name, imei, speed, date);
             } else {
                 updateInfoWindow(imei, speed, date);
                 markers[imei].setPosition(myLatLng);
@@ -55,11 +55,10 @@
             // map.setCenter(myLatLng);
         }
 
-        function initInfoWindow(imei, speed, date) {
+        function initInfoWindow(name, imei, speed, date) {
             var contentString = '<div id="content">' +
-                '<div id="siteNotice">' +
-                '</div>' +
-                '<h1 id="firstHeading" class="firstHeading" style="text-align:left;">' + imei + '</h1>' +
+                '<div id="siteNotice"></div>' +
+                '<h1 id="firstHeading" class="firstHeading" style="text-align:left;">' + name + '</h1>' +
                 '<div id="bodyContent" style="text-align:left;">' +
                 'Brzina: <span id="' + imei + '-speed-info-window">' + speed + '</span> kmh<br />' +
                 'Vreme GPS zapisa: <span id="' + imei + '-date-info-window">' + date + '</span>' +
@@ -83,7 +82,7 @@
             if (element_date) element_date.innerHTML = date;
         }
 
-        var serversocket = new WebSocket("ws://localhost:1337/location");
+        var serversocket = new WebSocket("ws://" + location.host + "/location/");
 
         serversocket.onopen = function () {
             // serversocket.send("Connection init");
@@ -93,18 +92,17 @@
             var res = JSON.parse(e.data);
             var date = new Date(res.gpstime * 1000);
 
-            var record_text = "[" + date + "] " + res.imei + ' : ' + res.lon + "," + res.lat;
-
-            console.log(record_text);
-
-            updateMarker(res.imei, res.speed, date, {lat: parseFloat(res.lat), lng: parseFloat(res.lon)});
+            updateMarker(res.name, res.imei, res.speed, date.toISOString(), {
+                lat: parseFloat(res.lat),
+                lng: parseFloat(res.lon)
+            });
 
             // document.getElementById("locations").innerHTML += record_text + "<br>";
         };
 
 
     </script>
-    <script src="https://maps.googleapis.com/maps/api/js?key=GOOGLE_MAPS_KEY&callback=initMap" async defer></script>
+    <script src="https://maps.googleapis.com/maps/api/js?key=&callback=initMap" async defer></script>
 </head>
 
 <body>

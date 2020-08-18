@@ -1,7 +1,7 @@
 /**
  * GPS Tracking Server
  */
-package gps_server
+package gpsserver
 
 import (
 	"bufio"
@@ -63,8 +63,8 @@ type GpsRecord struct {
 	Speed      int         `json:"speed"`
 	Satellites int         `json:"satellites"`
 	Sensors    []GpsSensor `json:"sensors"`
-	GpsTime    int         `json:"gpstime"` // vreme dobijeno od uređaja
-	Timestamp  int         `json:"timestamp"`
+	GpsTime    int64       `json:"gpstime"` // vreme dobijeno od uređaja
+	Timestamp  int64       `json:"timestamp"`
 	Protocol   string      `json:"protocol"`
 	Valid      bool        `json:"valid"` // Zapis smatramo validnim ako ima 3+ satelita
 }
@@ -75,6 +75,7 @@ type GpsServer struct {
 	mongoSession *mgo.Session
 	listener     net.Listener
 	protocol     GpsProtocolHandler
+	dbConfig     *DbConfig
 }
 
 type GpsServers struct {
@@ -101,7 +102,7 @@ func NewGpsServers(dbConfig *DbConfig) *GpsServers {
 	}
 }
 
-func (ss *GpsServers) NewGpsServer(name string, protocol GpsProtocolHandler) *GpsServer {
+func (ss *GpsServers) NewGpsServer(name string, protocol GpsProtocolHandler, dbConfig *DbConfig) *GpsServer {
 
 	log.Println("INFO", "Inicijalizacija servera:", name)
 
@@ -109,6 +110,7 @@ func (ss *GpsServers) NewGpsServer(name string, protocol GpsProtocolHandler) *Gp
 		name:         name,
 		mongoSession: ss.mongoSession,
 		protocol:     protocol,
+		dbConfig:     dbConfig,
 	}
 
 	return s
@@ -147,7 +149,9 @@ func (s *GpsServer) HandleRequest(conn net.Conn) {
 
 	defer log.Println("INFO", "Disconnecting:", conn.RemoteAddr())
 	defer conn.Close()
-	conn.SetReadDeadline(time.Now().Add(time.Second * 5))
+	if err := conn.SetReadDeadline(time.Now().Add(time.Second * 5)); err != nil {
+		log.Println("SetReadDeadline error: ", err)
+	}
 	scanner := bufio.NewScanner(conn)
 
 	for scanner.Scan() {
@@ -169,7 +173,7 @@ func (s *GpsServer) SaveGpsRecords(records []GpsRecord) bool {
 	sessionCopy := s.mongoSession.Copy()
 	defer sessionCopy.Close()
 
-	c := sessionCopy.DB("dbname").C("collection")
+	c := sessionCopy.DB(s.dbConfig.Name).C(s.dbConfig.Col)
 
 	for _, record := range records {
 		err1 := c.Insert(record)
@@ -178,7 +182,7 @@ func (s *GpsServer) SaveGpsRecords(records []GpsRecord) bool {
 			return false
 		}
 
-		log.Println("INFO", "Record sačuvan", record.Imei, record.Location.Coordinates, record.Speed, record.Sensors, time.Unix(int64(record.GpsTime), 0), record.Protocol)
+		log.Println("INFO", "Record sačuvan", record.Imei, record.Location.Coordinates, record.Speed, record.Sensors, time.Unix(record.GpsTime, 0), record.Protocol)
 	}
 
 	return true

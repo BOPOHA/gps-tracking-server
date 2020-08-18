@@ -2,7 +2,7 @@
 <head>
     <meta charset="UTF-8"/>
     <script>
-        var serversocket = new WebSocket("ws://localhost:8080/location");
+        var serversocket = new WebSocket("ws://" + location.host + "/location/");
 
         serversocket.onopen = function () {
             // serversocket.send("Connection init");

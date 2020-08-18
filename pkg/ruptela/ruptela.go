@@ -8,7 +8,7 @@ import (
 	"encoding/binary"
 	"errors"
 
-	"github.com/nenadvasic/gps-tracking-server/internal/gps_server"
+	"github.com/nenadvasic/gps-tracking-server/internal/gpsserver"
 	"github.com/nenadvasic/gps-tracking-server/internal/tools"
 	"log"
 	"net"
@@ -17,16 +17,16 @@ import (
 )
 
 const (
-	RUPTELA_COMMAND_RECORDS = 0x01
-	RUPTELA_PROTOCOL        = "ruptela"
+	RuptelaCommandRecords = 0x01
+	RuptelaProtocolName   = "ruptela"
 )
 
 type RuptelaProtocol struct {
 }
 
-func (p *RuptelaProtocol) Handle(readbuff []byte, conn net.Conn) gps_server.HandlerResponse {
+func (p *RuptelaProtocol) Handle(readbuff []byte, conn net.Conn) gpsserver.HandlerResponse {
 
-	res := gps_server.HandlerResponse{}
+	res := gpsserver.HandlerResponse{}
 
 	buff := bytes.NewBuffer(readbuff)
 
@@ -45,14 +45,14 @@ func (p *RuptelaProtocol) Handle(readbuff []byte, conn net.Conn) gps_server.Hand
 	return res
 }
 
-func (p *RuptelaProtocol) getRecords(buff *bytes.Buffer) ([]gps_server.GpsRecord, error) {
+func (p *RuptelaProtocol) getRecords(buff *bytes.Buffer) ([]gpsserver.GpsRecord, error) {
 
-	var records []gps_server.GpsRecord
+	var records []gpsserver.GpsRecord
 
 	var imei uint64
-	var tip byte           // tip zahteva
-	var records_left byte  // broj preostalih recorda na uređaju (ne koristimo za sada)
-	var records_count byte // broj recorda u tekućem zahtevu
+	var tip byte          // tip zahteva
+	var recordsLeft byte  // broj preostalih recorda na uređaju (ne koristimo za sada)
+	var recordsCount byte // broj recorda u tekućem zahtevu
 	var gpstime uint32
 	var lon int32
 	var lat int32
@@ -74,17 +74,17 @@ func (p *RuptelaProtocol) getRecords(buff *bytes.Buffer) ([]gps_server.GpsRecord
 
 	// log.Println("INFO", "Device IMEI:", imeiString)
 
-	if tip != RUPTELA_COMMAND_RECORDS {
+	if tip != RuptelaCommandRecords {
 		log.Println("ERROR", "Nepoznat tip zahteva:", tip)
-		return nil, errors.New("Nepoznat tip zahteva")
+		return nil, errors.New("nepoznat tip zahteva")
 	}
 
-	binary.Read(buff, binary.BigEndian, &records_left)
-	binary.Read(buff, binary.BigEndian, &records_count)
+	binary.Read(buff, binary.BigEndian, &recordsLeft)
+	binary.Read(buff, binary.BigEndian, &recordsCount)
 
-	log.Println("INFO", "Broj recorda u zahtevu:", records_count)
+	log.Println("INFO", "Broj recorda u zahtevu:", recordsCount)
 
-	for i := 0; i < int(records_count); i++ {
+	for i := 0; i < int(recordsCount); i++ {
 
 		binary.Read(buff, binary.BigEndian, &gpstime)
 
@@ -97,67 +97,67 @@ func (p *RuptelaProtocol) getRecords(buff *bytes.Buffer) ([]gps_server.GpsRecord
 		binary.Read(buff, binary.BigEndian, &sat)
 		binary.Read(buff, binary.BigEndian, &speed)
 
-		lon_float := float64(lon) / 10000000
-		lat_float := float64(lat) / 10000000
+		lonFloat := float64(lon) / 10000000
+		latFloat := float64(lat) / 10000000
 
-		if !tools.IsValidCoordinates(lat_float, lon_float) {
-			log.Println("ERROR", "Nepravilne vrednosti koordinata! IMEI:", imeiString, "Lon:", lon_float, "Lat:", lat_float)
+		if !tools.IsValidCoordinates(latFloat, lonFloat) {
+			log.Println("ERROR", "Nepravilne vrednosti koordinata! IMEI:", imeiString, "Lon:", lonFloat, "Lat:", latFloat)
 			continue
 		}
 
-		location := gps_server.GeoJson{"Point", []float64{lon_float, lat_float}}
-		sensors := make([]gps_server.GpsSensor, 0) // TODO
+		location := gpsserver.GeoJson{Type: "Point", Coordinates: []float64{lonFloat, latFloat}}
+		sensors := make([]gpsserver.GpsSensor, 0) // TODO
 
 		buff.Next(2)
 
 		// Senzori mogu da šalju podatke u setovima veličine 1/2/4/8 bajtova
 		// Podaci su naslagani redom sa prefix bajtom koji predstavlja broj bajtova u setu (bytes_count)
-		var bytes_count byte
-		var sensor_id byte
+		var bytesCount byte
+		var sensorId byte
 		var data1 byte
 		var data2 uint16
 		var data4 uint32
 		var data8 uint64
 
 		// Read 1 byte data
-		binary.Read(buff, binary.BigEndian, &bytes_count)
+		binary.Read(buff, binary.BigEndian, &bytesCount)
 		// fmt.Println(bytes_count)
-		for j := 0; j < int(bytes_count); j++ {
-			binary.Read(buff, binary.BigEndian, &sensor_id)
+		for j := 0; j < int(bytesCount); j++ {
+			binary.Read(buff, binary.BigEndian, &sensorId)
 			binary.Read(buff, binary.BigEndian, &data1)
 			// TODO: Dodavanje u slice sensors
 		}
 
 		// Read 2 byte data
-		binary.Read(buff, binary.BigEndian, &bytes_count)
+		binary.Read(buff, binary.BigEndian, &bytesCount)
 		// fmt.Println(bytes_count)
-		for j := 0; j < int(bytes_count); j++ {
-			binary.Read(buff, binary.BigEndian, &sensor_id)
+		for j := 0; j < int(bytesCount); j++ {
+			binary.Read(buff, binary.BigEndian, &sensorId)
 			binary.Read(buff, binary.BigEndian, &data2)
 			// TODO: Dodavanje u slice sensors
 		}
 
 		// Read 4 byte data
-		binary.Read(buff, binary.BigEndian, &bytes_count)
+		binary.Read(buff, binary.BigEndian, &bytesCount)
 		// fmt.Println(bytes_count)
-		for j := 0; j < int(bytes_count); j++ {
-			binary.Read(buff, binary.BigEndian, &sensor_id)
+		for j := 0; j < int(bytesCount); j++ {
+			binary.Read(buff, binary.BigEndian, &sensorId)
 			binary.Read(buff, binary.BigEndian, &data4)
 			// TODO: Dodavanje u slice sensors
 		}
 
 		// Read 8 byte data
-		binary.Read(buff, binary.BigEndian, &bytes_count)
+		binary.Read(buff, binary.BigEndian, &bytesCount)
 		// fmt.Println(bytes_count)
-		for j := 0; j < int(bytes_count); j++ {
-			binary.Read(buff, binary.BigEndian, &sensor_id)
+		for j := 0; j < int(bytesCount); j++ {
+			binary.Read(buff, binary.BigEndian, &sensorId)
 			binary.Read(buff, binary.BigEndian, &data8)
 			// TODO: Dodavanje u slice sensors
 		}
 
-		is_valid := tools.IsValidRecord(sat)
+		isValid := tools.IsValidRecord(sat)
 
-		record := gps_server.GpsRecord{imeiString, location, float32(alt) / 10, float32(course) / 100, int(speed), int(sat), sensors, int(gpstime), int(time.Now().Unix()), RUPTELA_PROTOCOL, is_valid}
+		record := gpsserver.GpsRecord{Imei: imeiString, Location: location, Altitude: float32(alt) / 10, Course: float32(course) / 100, Speed: int(speed), Satellites: int(sat), Sensors: sensors, GpsTime: int64(gpstime), Timestamp: time.Now().Unix(), Protocol: RuptelaProtocolName, Valid: isValid}
 
 		records = append(records, record)
 	}

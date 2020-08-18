@@ -8,7 +8,7 @@ import (
 	"encoding/binary"
 
 	"errors"
-	"github.com/nenadvasic/gps-tracking-server/internal/gps_server"
+	"github.com/nenadvasic/gps-tracking-server/internal/gpsserver"
 	"github.com/nenadvasic/gps-tracking-server/internal/tools"
 	"log"
 	"net"
@@ -16,27 +16,27 @@ import (
 )
 
 const (
-	TELTONIKA_PROTOCOL     = "teltonika"
-	TELTONIKA_CODEC_GH3000 = 0x07
-	TELTONIKA_CODEC_FM4X00 = 0x08
-	TELTONIKA_CODEC_12     = 0x0C
+	TeltonikaProtocolName = "teltonika"
+	TeltonikaCodecGh3000  = 0x07
+	TeltonikaCodecFm4x00  = 0x08
+	TeltonikaCodec12      = 0x0C
 )
 
 type TeltonikaProtocol struct {
 }
 
-func (p *TeltonikaProtocol) Handle(readbuff []byte, conn net.Conn) gps_server.HandlerResponse {
+func (p *TeltonikaProtocol) Handle(readbuff []byte, conn net.Conn) gpsserver.HandlerResponse {
 	buff := bytes.NewBuffer(readbuff)
 
-	var start_bytes uint16
+	var startBytes uint16
 	var imei string
 
-	binary.Read(buff, binary.BigEndian, &start_bytes)
+	binary.Read(buff, binary.BigEndian, &startBytes)
 
-	res := gps_server.HandlerResponse{}
+	res := gpsserver.HandlerResponse{}
 
 	// Ako imamo nešto u prva 2 bajta onda je uređaj poslao svoj IMEI
-	if start_bytes > 0 {
+	if startBytes > 0 {
 
 		res.Imei = p.getIMEI(buff)
 
@@ -82,14 +82,14 @@ func (p *TeltonikaProtocol) getIMEI(buff *bytes.Buffer) string {
 	return tools.PadLeft(imei, "0", 15)
 }
 
-func (p *TeltonikaProtocol) getRecords(buff *bytes.Buffer, imei string) ([]gps_server.GpsRecord, error) {
+func (p *TeltonikaProtocol) getRecords(buff *bytes.Buffer, imei string) ([]gpsserver.GpsRecord, error) {
 
-	var records []gps_server.GpsRecord
+	var records []gpsserver.GpsRecord
 
-	var data_length uint32
+	var dataLength uint32
 	var codec byte
-	var priority byte      // ne koristimo za sada
-	var records_count byte // broj recorda u tekućem zahtevu
+	var priority byte     // ne koristimo za sada
+	var recordsCount byte // broj recorda u tekućem zahtevu
 	var gpstime uint64
 	var lon int32
 	var lat int32
@@ -100,21 +100,21 @@ func (p *TeltonikaProtocol) getRecords(buff *bytes.Buffer, imei string) ([]gps_s
 
 	buff.Next(2)
 
-	binary.Read(buff, binary.BigEndian, &data_length)
+	binary.Read(buff, binary.BigEndian, &dataLength)
 	binary.Read(buff, binary.BigEndian, &codec)
 
-	if codec == TELTONIKA_CODEC_12 {
+	if codec == TeltonikaCodec12 {
 		// TODO ?
 		return nil, errors.New("CODEC 12")
 	}
 
-	binary.Read(buff, binary.BigEndian, &records_count)
+	binary.Read(buff, binary.BigEndian, &recordsCount)
 
-	log.Println("INFO", "Broj recorda u zahtevu:", records_count)
+	log.Println("INFO", "Broj recorda u zahtevu:", recordsCount)
 
-	for i := 0; i < int(records_count); i++ {
+	for i := 0; i < int(recordsCount); i++ {
 
-		if codec == TELTONIKA_CODEC_GH3000 {
+		if codec == TeltonikaCodecGh3000 {
 			// TODO
 		} else {
 			binary.Read(buff, binary.BigEndian, &gpstime)
@@ -127,20 +127,20 @@ func (p *TeltonikaProtocol) getRecords(buff *bytes.Buffer, imei string) ([]gps_s
 			binary.Read(buff, binary.BigEndian, &sat)
 			binary.Read(buff, binary.BigEndian, &speed)
 
-			lon_float := float64(lon) / 10000000
-			lat_float := float64(lat) / 10000000
+			lonFloat := float64(lon) / 10000000
+			latFloat := float64(lat) / 10000000
 
-			if !tools.IsValidCoordinates(lat_float, lon_float) {
-				log.Println("ERROR", "Nepravilne vrednosti koordinata! IMEI:", imei, "Lon:", lon_float, "Lat:", lat_float)
+			if !tools.IsValidCoordinates(latFloat, lonFloat) {
+				log.Println("ERROR", "Nepravilne vrednosti koordinata! IMEI:", imei, "Lon:", lonFloat, "Lat:", latFloat)
 				continue
 			}
 
-			location := gps_server.GeoJson{"Point", []float64{lon_float, lat_float}}
-			sensors := make([]gps_server.GpsSensor, 0) // TODO
+			location := gpsserver.GeoJson{Type: "Point", Coordinates: []float64{lonFloat, latFloat}}
+			sensors := make([]gpsserver.GpsSensor, 0) // TODO
 
-			is_valid := tools.IsValidRecord(sat)
+			isValid := tools.IsValidRecord(sat)
 
-			record := gps_server.GpsRecord{imei, location, float32(alt) / 10, float32(course) / 100, int(speed), int(sat), sensors, int(gpstime / 1000), int(time.Now().Unix()), TELTONIKA_PROTOCOL, is_valid}
+			record := gpsserver.GpsRecord{Imei: imei, Location: location, Altitude: float32(alt) / 10, Course: float32(course) / 100, Speed: int(speed), Satellites: int(sat), Sensors: sensors, GpsTime: int64(gpstime / 1000), Timestamp: time.Now().Unix(), Protocol: TeltonikaProtocolName, Valid: isValid}
 
 			// log.Println(record)
 

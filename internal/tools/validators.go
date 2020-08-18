@@ -1,12 +1,12 @@
 package tools
 
-func IsValidCoordinates(lat_float float64, lon_float float64) bool {
-	if lon_float == 0 || lon_float < -180 || lon_float > 180 || lat_float == 0 || lat_float < -90 || lat_float > 90 {
+func IsValidCoordinates(latFloat float64, lonFloat float64) bool {
+	if lonFloat == 0 || lonFloat < -180 || lonFloat > 180 || latFloat == 0 || latFloat < -90 || latFloat > 90 {
 		return false
 	}
 	return true
 }
 
 func IsValidRecord(satellites byte) bool {
-	return (satellites > 3)
+	return satellites > 3
 }

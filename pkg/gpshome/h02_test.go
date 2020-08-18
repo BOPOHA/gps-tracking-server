@@ -1,48 +1,43 @@
 package gpshome
 
 import (
-	"encoding/hex"
-	"fmt"
+	"github.com/nenadvasic/gps-tracking-server/internal/gpsserver"
+	"github.com/nenadvasic/gps-tracking-server/internal/tools"
 	"testing"
 )
 
-// 77.222.24.97 - - [29/Jun/2020 22:32:20] "*HQ,7028114082,V1,203218,A,4217.3750,N,01850.6526,E,000.00,281,290620,FFFFBBFF,0,0,0,0#$p(@ ) B5B
-// 2020/06/29 23:43:04 INFO Record sačuvan 5849110696187932977 [82.550456 84.1761068] 13111 [] 1996-09-03 18:00:49 +0200 CEST gpshome
-// 2020/06/29 23:39:48 INFO Record sačuvan 5849110696187932977 [82.5767216 77.53045] 12336 [] 1998-10-25 14:49:02 +0100 CET gpshome
-
-const msg1 = "2a48512c373032383131343038322c56312c3231343934322c412c343231372e333736332c4e2c30313835302e363534332c" +
-	"452c3030302e30302c3030302c3239303632302c46464646424246462c302c302c302c302300000000000000000000000000"
+const msg1 = "*HQ,7028114082,V1,145801,A,4217.4213,N,01850.4384,E,025.36,344,180820,FFFFBBFF,0,0,0,0#"
 
 var (
-	badInMsg = [][]byte{
-		[]byte{
-			36, 112, 40, 17, 64, 130, 35, 0, 5, 5, 7, 32, 66, 23, 56, 22, 65, 1, 133, 6, 128, 60, 0, 0, 0, 255, 255, 187, 255, 0, 0, 0, 0, 1, 41, 2, 79, 109, 40, 214, 13, 79, 109, 40, 216, 9, 79, 109, 39, 135, 8, 8, 0, 0,
+	gpsRecord1 = gpsserver.GpsRecord{
+		Imei: "7028114082",
+		Location: gpsserver.GeoJson{
+			Type:        "Point",
+			Coordinates: []float64{18.84064, 42.290355},
 		},
+		Course:   344,
+		Speed:    25,
+		GpsTime:  1597762681,
+		Protocol: protocolName,
+		Valid:    true,
+	}
+	msgMatrix0 = []struct {
+		msg string
+		gps gpsserver.GpsRecord
+	}{
+		{msg1, gpsRecord1},
 	}
 )
 
 func TestGpsHomeProtocol_Handle(t *testing.T) {
 	h := GpsHomeProtocol{}
-	decoded, err := hex.DecodeString(msg1)
-	//fmt.Printf("Decoded: %#v\n", decoded)
-	_, err = h.parseMsg(decoded)
-
-	fmt.Printf("Len: %v, err: %v\n", len(decoded), err)
-	if err != nil {
-		t.Errorf("Len: %v, err: %v\n", len(decoded), err)
-	}
-}
-
-func TestGpsHomeProtocol_Handle2(t *testing.T) {
-	h := GpsHomeProtocol{}
-	for _, msg := range badInMsg {
-		//fmt.Printf("Decoded: %#v\n", decoded)
-		_, err := h.parseMsg(msg)
-
-		fmt.Printf("Len: %v, err: %v\n", len(msg), err)
-		if err == nil {
-			t.Errorf("Len: %v, err: %v\n", len(msg), err)
+	for i, matrix := range msgMatrix0 {
+		record, err := h.parseMsg([]byte(matrix.msg))
+		if err != nil {
+			t.Errorf("TestGpsHomeProtocol_Handle: %v err: %v\n", i, err)
 		}
+		record.Timestamp = 0
+		tools.AssertEqual(t, matrix.gps, record)
 	}
 
 }
