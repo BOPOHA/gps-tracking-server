@@ -12,6 +12,8 @@ import (
 	"labix.org/v2/mgo/bson"
 	"log"
 	"net/http"
+	"strconv"
+	"strings"
 	"time"
 )
 
@@ -44,12 +46,14 @@ func main() {
 	box := pkger.Dir("/web")
 	locationHandler := NewLocationHTTPHandler()
 	http.Handle("/location/", locationHandler)
+	http.HandleFunc("/geojson/", locationHandler.getGPXxml)
 	http.Handle("/", http.FileServer(box))
 	err := http.ListenAndServe(":1337", nil)
 	if err != nil {
 		panic("Error: " + err.Error())
 	}
 }
+
 func NewLocationHTTPHandler() LocationHTTPHandler {
 
 	devices := make(map[string]*Device)
@@ -89,7 +93,7 @@ func (l LocationHTTPHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if l.MongoSession == nil {
-		println("creating a new session: " + r.RemoteAddr)
+		println("creating a new session for: " + r.RemoteAddr)
 		l.NewMongoSession()
 	}
 
@@ -99,6 +103,7 @@ func (l LocationHTTPHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	c := sessionCopy.DB(l.DbConfig.Name).C(l.DbConfig.Col)
 
 	var record gpsserver.GpsRecord
+	var isFirstResponce = true
 
 	for {
 		for shortName, device := range l.Devices {
@@ -109,8 +114,7 @@ func (l LocationHTTPHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				continue
 			}
 
-			println(r.RemoteAddr, record.GpsTime > device.Timestamp, device.Timestamp, record.GpsTime)
-			if record.GpsTime > device.Timestamp {
+			if record.GpsTime > device.Timestamp || isFirstResponce {
 
 				coor := record.Location.Coordinates
 				marker := MapMarker{shortName, record.Imei, record.GpsTime, coor[0], coor[1], record.Speed}
@@ -126,6 +130,7 @@ func (l LocationHTTPHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				}
 
 				device.Timestamp = record.GpsTime
+				isFirstResponce = false
 			} else {
 				if err := conn.WriteMessage(websocket.PingMessage, []byte{}); err != nil {
 					log.Println("closing websocket: ", r.RemoteAddr, err)
@@ -137,3 +142,158 @@ func (l LocationHTTPHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 }
+
+func (l LocationHTTPHandler) getGPXxml(w http.ResponseWriter, r *http.Request) {
+
+	log.Println("Req: ", r.RemoteAddr, r.RequestURI)
+	split := strings.Split(r.RequestURI, "/")
+	if len(split) < 4 {
+		http.Error(w, "not enough params", http.StatusBadRequest)
+	}
+	deviceImei := split[2]
+	strMinTimestamp := split[3]
+	strMaxTimestamp := split[4]
+
+	if len(strMinTimestamp) < 13 || len(strMaxTimestamp) < 13 {
+		http.Error(w, "bad timestamps", http.StatusBadRequest)
+		return
+	}
+	minRange, err := strconv.ParseInt(strMinTimestamp[:10], 10, 64)
+	if err != nil {
+		http.Error(w, "cant parse minRange", http.StatusBadRequest)
+		return
+	}
+	maxRange, err := strconv.ParseInt(strMaxTimestamp[:10], 10, 64)
+	if err != nil {
+		http.Error(w, "cant parse maxRange", http.StatusBadRequest)
+		return
+	}
+	var records []gpsserver.GpsRecord
+
+	if l.MongoSession == nil {
+		log.Println("creating a new session: " + r.RemoteAddr)
+		l.NewMongoSession()
+	}
+
+	sessionCopy := l.MongoSession.Copy()
+	defer sessionCopy.Close()
+
+	c := sessionCopy.DB(l.DbConfig.Name).C(l.DbConfig.Col)
+
+	_ = c.Find(bson.M{
+		"imei":    deviceImei,
+		"gpstime": bson.M{"$gt": minRange, "$lt": maxRange},
+	}).All(&records)
+
+	points := make([]GpsJSONFeature, 0)
+
+	for id, v := range records {
+		point := GpsJSONFeature{
+			Type:     "Feature",
+			Geometry: v.Location,
+			Properties: GpsJSONProperties{
+				PointId:   id,
+				Speed:     v.Speed,
+				Course:    v.Course,
+				GpsTime:   time.Unix(v.GpsTime, 0),
+				Timestamp: v.Timestamp,
+				Sat:       v.Satellites,
+			},
+		}
+		points = append(points, point)
+	}
+	rest := GpsJSONFeatures{
+		Type:     "FeatureCollection",
+		Features: points,
+	}
+
+	v, err := json.Marshal(rest)
+	if err != nil {
+		log.Println("err marshaling geojson:", err)
+	}
+	w.Header().Add("Content-Type", "application/vnd.geo+json")
+	w.WriteHeader(http.StatusOK)
+	w.Write(v)
+
+}
+
+type GpsJSONProperties struct {
+	PointId   int
+	Speed     int
+	Course    float32
+	GpsTime   time.Time
+	Timestamp int64
+	Sat       int
+}
+
+type GpsJSONFeature struct {
+	Type     string `json:"type"`
+	Geometry struct {
+		Type        string    `json:"type"`
+		Coordinates []float64 `json:"coordinates"`
+	} `json:"geometry"`
+	Properties GpsJSONProperties `json:"properties,omitempty"`
+}
+
+type GpsJSONFeatures struct {
+	Type     string           `json:"type"`
+	Features []GpsJSONFeature `json:"features"`
+}
+
+//var points []geojson.Object
+//for _, v := range records {
+//	point := geojson.NewPoint(geometry.Point{
+//		X: v.Location.Coordinates[1],
+//		Y: v.Location.Coordinates[0],
+//	})
+//	point.AppendJSON([]byte("ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZzz"))
+//	points = append(points, point)
+//}
+//gjsonFCollection := geojson.NewFeatureCollection(points)
+//w.Header().Add("Content-Type", "application/vnd.geo+json")
+//w.WriteHeader(http.StatusOK)
+//w.Write(gjsonFCollection.AppendJSON(nil))
+
+//wptRecords := []*gpx.WptType{}
+//
+//for _, v := range records {
+//	wptR := gpx.WptType{
+//		Lat:           v.Location.Coordinates[1],
+//		Lon:           v.Location.Coordinates[0],
+//		Ele:           float64(v.Altitude),
+//		Speed:         float64(v.Speed),
+//		Course:        float64(v.Course),
+//		Time:          time.Unix(v.Timestamp, 0),
+//		MagVar:        0,
+//		GeoidHeight:   0,
+//		Name:          "",
+//		Cmt:           "",
+//		Desc:          "",
+//		Src:           "",
+//		Link:          nil,
+//		Sym:           "",
+//		Type:          v.Location.Type,
+//		Fix:           "",
+//		Sat:           v.Satellites,
+//		HDOP:          0,
+//		VDOP:          0,
+//		PDOP:          0,
+//		AgeOfDGPSData: 0,
+//		DGPSID:        nil,
+//		Extensions:    nil,
+//	}
+//
+//	wptRecords = append(wptRecords, &wptR)
+//}
+//
+//w.Write([]byte(xml.Header))
+//
+//g := &gpx.GPX{
+//	Version: "1.0",
+//	Creator: "GPS-TRACKER IMEI: " + deviceImei,
+//	Wpt:     wptRecords,
+//}
+//
+//if err := g.WriteIndent(w, "", "  "); err != nil {
+//	fmt.Printf("err == %v", err)
+//}

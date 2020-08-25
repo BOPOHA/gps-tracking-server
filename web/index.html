@@ -17,6 +17,12 @@
             width: 80%;
             margin: 60px auto;
         }
+
+        #showHistoryForm {
+            height: 30px;
+            width: 80%;
+            margin: 5px auto;
+        }
     </style>
     <script>
 
@@ -87,6 +93,7 @@
             });
 
             markers[imei].addListener('click', function () {
+                document.getElementById("device_imei").innerText = imei;
                 infowindow.open(map, markers[imei]);
             });
         }
@@ -101,9 +108,40 @@
 
     </script>
     <script src="https://maps.googleapis.com/maps/api/js?key=&callback=initMap" async defer></script>
+    <script>
+        function showTrackForDevice() {
+            timestampFrom = new Date(document.getElementById("map_date_from").value).getTime();
+            timestampTo = new Date(document.getElementById("map_date_to").value).getTime();
+            device_imei = document.getElementById("device_imei").innerText;
+
+            map.data.loadGeoJson(`geojson/${device_imei}/${timestampFrom}/${timestampTo}/geo.json`, {idPropertyName: "PointId"});
+            // map.data.setStyle({
+            //         icon: {path: google.maps.SymbolPath.CIRCLE, scale: 10},
+            // icon:  '/truck.png',
+            // }
+            // );
+            infoWindow = new google.maps.InfoWindow({content: ""});
+            map.data.addListener('click', function (event) {
+                infoWindow.setContent('<div style="line-height:1.35;overflow:hidden;white-space:nowrap;">id = ' + event.feature.getId() + "; Speed: " + event.feature.getProperty("Speed") + "<br/>GpsTime " + event.feature.getProperty("GpsTime") + "</div>");
+                var anchor = new google.maps.MVCObject();
+                anchor.set("position", event.latLng);
+                infoWindow.open(map, anchor);
+            });
+        }
+    </script>
 </head>
 
 <body>
+<div id="showHistoryForm">
+    <label for="device_imei">Selected device: </label><a type="text" id="device_imei"></a>
+    <form action="#">
+        <label for="map_date_from">From: </label>
+        <input type="date" id="map_date_from"/>
+        <label for="map_date_to">To: </label>
+        <input type="datetime-local" id="map_date_to"/>
+        <input type="button" value="Submit" onclick="showTrackForDevice();"/>
+    </form>
+</div>
 <div id="map"></div>
 </body>
 </html>

@@ -76,20 +76,6 @@ func (p *GpsHomeProtocol) Handle(readbuff []byte, conn net.Conn) gpsserver.Handl
 	var res gpsserver.HandlerResponse
 	var records []gpsserver.GpsRecord
 
-	select {
-	case cmd, ok := <-p.CmdReader:
-		if ok {
-			fmt.Printf("Value %s was read.\n", cmd)
-			_, err2 := conn.Write(cmd)
-			if err2 != nil {
-				res.Error = err2
-			}
-		} else {
-			fmt.Println("Channel closed!")
-		}
-	default:
-		fmt.Println("No value ready, moving on.")
-	}
 	if len(readbuff) == 0 {
 		log.Println("empty message")
 		return res
@@ -97,6 +83,21 @@ func (p *GpsHomeProtocol) Handle(readbuff []byte, conn net.Conn) gpsserver.Handl
 	record, err1 := p.parseMsg(readbuff)
 	if err1 != nil {
 		res.Error = err1
+	} else {
+		select {
+		case cmd, ok := <-p.CmdReader:
+			if ok {
+				log.Printf("Value %s was read.\n", cmd)
+				_, err2 := conn.Write(cmd)
+				if err2 != nil {
+					res.Error = err2
+				}
+			} else {
+				log.Println("Channel closed!")
+			}
+		default:
+			log.Println("No value ready, moving on.")
+		}
 	}
 	res.Records = append(records, record)
 

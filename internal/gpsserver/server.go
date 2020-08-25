@@ -139,7 +139,14 @@ func (s *GpsServer) Serve() {
 	for {
 		conn, err := s.listener.Accept()
 		if err != nil {
-			panic(err)
+			log.Println("Listener accept error: ", err)
+			continue
+		}
+		err = conn.SetReadDeadline(time.Now().Add(time.Second * 1))
+		if err != nil {
+			log.Println("SetReadDeadline error: ", err)
+			conn.Close()
+			continue
 		}
 		go s.HandleRequest(conn)
 	}
@@ -149,9 +156,6 @@ func (s *GpsServer) HandleRequest(conn net.Conn) {
 
 	defer log.Println("INFO", "Disconnecting:", conn.RemoteAddr())
 	defer conn.Close()
-	if err := conn.SetReadDeadline(time.Now().Add(time.Second * 5)); err != nil {
-		log.Println("SetReadDeadline error: ", err)
-	}
 	scanner := bufio.NewScanner(conn)
 
 	for scanner.Scan() {
