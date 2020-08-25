@@ -32,6 +32,23 @@
             });
 
             // document.getElementById("map").setAttribute("style", "height:" + window.innerHeight);
+            var serversocket = new WebSocket("ws://" + location.host + "/location/");
+
+            serversocket.onopen = function () {
+                // serversocket.send("Connection init");
+            }
+
+            serversocket.onmessage = function (e) {
+                var res = JSON.parse(e.data);
+                var date = new Date(res.gpstime * 1000);
+
+                updateMarker(res.name, res.imei, res.speed, date.toISOString(), {
+                    lat: parseFloat(res.lat),
+                    lng: parseFloat(res.lon)
+                });
+
+                // document.getElementById("locations").innerHTML += record_text + "<br>";
+            };
         }
 
         function updateMarker(name, imei, speed, date, myLatLng) {
@@ -81,25 +98,6 @@
             if (element_speed) element_speed.innerHTML = speed;
             if (element_date) element_date.innerHTML = date;
         }
-
-        var serversocket = new WebSocket("ws://" + location.host + "/location/");
-
-        serversocket.onopen = function () {
-            // serversocket.send("Connection init");
-        }
-
-        serversocket.onmessage = function (e) {
-            var res = JSON.parse(e.data);
-            var date = new Date(res.gpstime * 1000);
-
-            updateMarker(res.name, res.imei, res.speed, date.toISOString(), {
-                lat: parseFloat(res.lat),
-                lng: parseFloat(res.lon)
-            });
-
-            // document.getElementById("locations").innerHTML += record_text + "<br>";
-        };
-
 
     </script>
     <script src="https://maps.googleapis.com/maps/api/js?key=&callback=initMap" async defer></script>
