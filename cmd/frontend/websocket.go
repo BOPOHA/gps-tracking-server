@@ -89,7 +89,7 @@ func (l LocationHTTPHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if l.MongoSession == nil {
-		println("creating a new session" + "dddd")
+		println("creating a new session: " + r.RemoteAddr)
 		l.NewMongoSession()
 	}
 
@@ -103,12 +103,13 @@ func (l LocationHTTPHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	for {
 		for shortName, device := range l.Devices {
 
-			err := c.Find(bson.M{"imei": device.Imei}).Sort("-gpstime").One(&record)
+			err := c.Find(bson.M{"imei": device.Imei}).Sort("-gpstime").Limit(1).One(&record)
 
 			if err != nil {
 				continue
 			}
 
+			println(r.RemoteAddr, record.GpsTime > device.Timestamp, device.Timestamp, record.GpsTime)
 			if record.GpsTime > device.Timestamp {
 
 				coor := record.Location.Coordinates
@@ -119,13 +120,17 @@ func (l LocationHTTPHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 					continue
 				}
 
-				err1 := conn.WriteMessage(websocket.TextMessage, out)
-				if err1 != nil {
+				if err := conn.WriteMessage(websocket.TextMessage, out); err != nil {
 					log.Println("err write msg to websocket:", err, string(out))
 					return
 				}
 
 				device.Timestamp = record.GpsTime
+			} else {
+				if err := conn.WriteMessage(websocket.PingMessage, []byte{}); err != nil {
+					log.Println("closing websocket: ", r.RemoteAddr, err)
+					return
+				}
 			}
 		}
 		time.Sleep(5 * time.Second)
