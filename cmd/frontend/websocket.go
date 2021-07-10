@@ -9,7 +9,7 @@ import (
 	"github.com/nenadvasic/gps-tracking-server/internal/gpsconfig"
 	"github.com/nenadvasic/gps-tracking-server/internal/gpsserver"
 	"gopkg.in/mgo.v2"
-	"labix.org/v2/mgo/bson"
+	"gopkg.in/mgo.v2/bson"
 	"log"
 	"net/http"
 	"strconv"

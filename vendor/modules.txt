@@ -33,8 +33,3 @@ gopkg.in/mgo.v2/internal/sasl
 gopkg.in/mgo.v2/internal/scram
 # gopkg.in/yaml.v2 v2.3.0
 ## explicit
-# labix.org/v2/mgo v0.0.0-20140701140051-000000000287
-## explicit
-labix.org/v2/mgo/bson
-# launchpad.net/gocheck v0.0.0-20140225173054-000000000087
-## explicit
