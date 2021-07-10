@@ -1,3 +1,5 @@
+.PHONY: vendor
+
 help:
 	# "make [vendor|front|back|bundle|dev]"
 
