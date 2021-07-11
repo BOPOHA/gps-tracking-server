@@ -1,0 +1,3 @@
+[centos@dns ~]$ sudo mkdir /srv/db
+[centos@dns ~]$ sudo chown centos:centos  /srv/db
+[centos@dns ~]$ podman run -d --name mongod -p 27017:27017 -v /srv/db:/data/db:Z mongo

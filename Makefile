@@ -19,10 +19,10 @@ test:
 
 front:
 	@go generate cmd/frontend/*.go
-	@go build -o ~/bin/gps-frontend cmd/frontend/*go
+	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -a -ldflags="-extldflags=-static" -o ~/bin/gps-frontend cmd/frontend/*go
 
 back:
-	@go build -o ~/bin/gps-gatewayd cmd/gatewayd/*go
+	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -a -ldflags="-extldflags=-static" -o ~/bin/gps-gatewayd cmd/gatewayd/*go
 
 push:
 	@scp ~/bin/gps-frontend gps.host:
